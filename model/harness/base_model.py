@@ -183,109 +183,111 @@ class ModelBase(nn.Module):
         return model
 
     def print_detailed_parameter_counts(self) -> None:
-        @dataclasses.dataclass
-        class NodeContent:
-            # The number of distinct named parameters which have hit this path
-            route_count: int
-            # The total number of learnable parameters under this node
-            learnable_param_count: int
-            # The total number of all parameters under this node
-            total_param_count: int
-            # normalized_key => (keys_set, node_content) where:
-            # - normalized_key can combined multiple keys together, e.g. "fc*"
-            # - keys_set is the local matching keys, e.g. "fc1", "fc2" for "fc*"
-            children: dict[str, tuple[set[str], Self]]
+        print_detailed_parameter_counts(self, f"model ({self.model_name})")
 
-            @classmethod
-            def default(cls) -> Self:
-                return cls(route_count=0, learnable_param_count=0, total_param_count=0, children={})
+def print_detailed_parameter_counts(nn_module, module_name) -> None:
+    @dataclasses.dataclass
+    class NodeContent:
+        # The number of distinct named parameters which have hit this path
+        route_count: int
+        # The total number of learnable parameters under this node
+        learnable_param_count: int
+        # The total number of all parameters under this node
+        total_param_count: int
+        # normalized_key => (keys_set, node_content) where:
+        # - normalized_key can combined multiple keys together, e.g. "fc*"
+        # - keys_set is the local matching keys, e.g. "fc1", "fc2" for "fc*"
+        children: dict[str, tuple[set[str], Self]]
 
-            def add(self, path, requires_grad, param_count):
-                self.route_count += 1
-                self.total_param_count += param_count
-                if requires_grad:
-                    self.learnable_param_count += param_count
+        @classmethod
+        def default(cls) -> Self:
+            return cls(route_count=0, learnable_param_count=0, total_param_count=0, children={})
 
-                if len(path) > 0:
-                    child_key = path.pop(0)
-                    normalized_key = re.sub(r'\d+', '*', child_key)
-                    if normalized_key not in self.children:
-                        self.children[normalized_key] = {child_key}, NodeContent.default()
+        def add(self, path, requires_grad, param_count):
+            self.route_count += 1
+            self.total_param_count += param_count
+            if requires_grad:
+                self.learnable_param_count += param_count
 
-                    child_keys, child_node = self.children[normalized_key]
-                    child_keys.add(child_key)
-                    child_node.add(path, requires_grad, param_count)
+            if len(path) > 0:
+                child_key = path.pop(0)
+                normalized_key = re.sub(r'\d+', '*', child_key)
+                if normalized_key not in self.children:
+                    self.children[normalized_key] = {child_key}, NodeContent.default()
 
-            def print(
+                child_keys, child_node = self.children[normalized_key]
+                child_keys.add(child_key)
+                child_node.add(path, requires_grad, param_count)
+
+        def print(
                 self,
                 prefix: str = "",
                 depth: int = 0,
                 total_learnable: Optional[int] = None,
                 total_any: Optional[int] = None,
-            ) -> None:
-                indent = "  " * depth
-                if total_learnable is None:
-                    total_learnable = self.learnable_param_count
-                learnable_just_len = max(len("Learnable Weights"), len(f"{total_learnable:,}"))
-                if total_any is None:
-                    total_any = self.total_param_count
-                    print(f" Leaf | {"Learnable Weights".rjust(learnable_just_len)} | %Learn |   %All | Module")
+        ) -> None:
+            indent = "  " * depth
+            if total_learnable is None:
+                total_learnable = self.learnable_param_count
+            learnable_just_len = max(len("Learnable Weights"), len(f"{total_learnable:,}"))
+            if total_any is None:
+                total_any = self.total_param_count
+                print(f" Leaf | {"Learnable Weights".rjust(learnable_just_len)} | %Learn |   %All | Module")
 
-                leaf_part = ("**" if len(self.children) == 0 else " ").center(6)
-                learnable_part = f"{self.learnable_param_count:,}".rjust(learnable_just_len)
-                perc_learnable_part = f"{self.learnable_param_count/total_learnable:.1%}".rjust(6)
-                perc_all_part = f"{self.learnable_param_count/total_any:.1%}".rjust(6)
+            leaf_part = ("**" if len(self.children) == 0 else " ").center(6)
+            learnable_part = f"{self.learnable_param_count:,}".rjust(learnable_just_len)
+            perc_learnable_part = f"{self.learnable_param_count / total_learnable:.1%}".rjust(6)
+            perc_all_part = f"{self.learnable_param_count / total_any:.1%}".rjust(6)
 
-                print_prefix = f"{leaf_part}| {learnable_part} | {perc_learnable_part} | {perc_all_part} | {indent}"
+            print_prefix = f"{leaf_part}| {learnable_part} | {perc_learnable_part} | {perc_all_part} | {indent}"
 
-                match len(self.children):
-                    case 0:
-                        if self.route_count > 1:
-                            prefix += f" ({self.route_count} total)"
-                        print(f"{print_prefix}{prefix}")
-                    case 1:
-                        # Delegate to single child
-                        child_key, (child_keys, child_node) = next(iter(self.children.items()))
+            match len(self.children):
+                case 0:
+                    if self.route_count > 1:
+                        prefix += f" ({self.route_count} total)"
+                    print(f"{print_prefix}{prefix}")
+                case 1:
+                    # Delegate to single child
+                    child_key, (child_keys, child_node) = next(iter(self.children.items()))
+                    if len(child_keys) == 1:
+                        # Use the un-normalized key, e.g. fc1
+                        child_key = next(iter(child_keys))
+                    else:
+                        # Show the count of different layers, e.g. fc*[count=4]
+                        child_key = f"{child_key}[count={len(child_keys)}]"
+                    child_node.print(
+                        prefix=f"{prefix}.{child_key}",
+                        depth=depth,
+                        total_learnable=total_learnable,
+                        total_any=total_any,
+                    )
+                case _:
+                    print(f"{print_prefix}{prefix}")
+                    sorted_children = sorted(
+                        self.children.items(),
+                        key=lambda item: item[1][1].learnable_param_count,
+                        reverse=True
+                    )
+                    for child_key, (child_keys, child_node) in sorted_children:
                         if len(child_keys) == 1:
                             # Use the un-normalized key, e.g. fc1
                             child_key = next(iter(child_keys))
                         else:
-                            # Show the count of different layers, e.g. fc*[count=4]
-                            child_key = f"{child_key}[count={len(child_keys)}]"
+                            # Show the count of different layers, e.g. fc*[10]
+                            child_key = f"{child_key}[{len(child_keys)}]"
                         child_node.print(
-                            prefix=f"{prefix}.{child_key}",
-                            depth=depth,
+                            prefix=f".{child_key}",
+                            depth=depth + 1,
                             total_learnable=total_learnable,
                             total_any=total_any,
                         )
-                    case _:
-                        print(f"{print_prefix}{prefix}")
-                        sorted_children = sorted(
-                            self.children.items(),
-                            key=lambda item: item[1][1].learnable_param_count,
-                            reverse=True
-                        )
-                        for child_key, (child_keys, child_node) in sorted_children:
-                            if len(child_keys) == 1:
-                                # Use the un-normalized key, e.g. fc1
-                                child_key = next(iter(child_keys))
-                            else:
-                                # Show the count of different layers, e.g. fc*[10]
-                                child_key = f"{child_key}[{len(child_keys)}]"
-                            child_node.print(
-                                prefix=f".{child_key}",
-                                depth=depth + 1,
-                                total_learnable=total_learnable,
-                                total_any=total_any,
-                            )
 
-        root_node = NodeContent.default()
+    root_node = NodeContent.default()
 
-        for name, parameter in self.named_parameters():
-            root_node.add(name.split("."), parameter.requires_grad, parameter.numel())
-        
-        print(f"This {self.__class__.__name__} has the following learnable weights:")
-        root_node.print(prefix=f"model ({self.model_name})")
-        print()
+    for name, parameter in nn_module.named_parameters():
+        root_node.add(name.split("."), parameter.requires_grad, parameter.numel())
 
+    print(f"This {nn_module.__class__.__name__} has the following learnable weights:")
+    root_node.print(prefix=module_name)
+    print()
 

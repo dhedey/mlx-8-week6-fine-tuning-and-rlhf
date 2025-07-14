@@ -1,4 +1,4 @@
-from .base_model import ModelBase
+from .base_model import ModelBase, print_detailed_parameter_counts
 from .base_processor import ProcessorBase, TrainingDatasets
 from .base_trainer import BatchResults, EpochTrainingResults, FullTrainingResults, TrainingState, TrainingOverrides, \
     ModelTrainerBase, TrainingConfig
