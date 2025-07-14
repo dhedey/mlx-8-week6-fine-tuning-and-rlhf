@@ -1,12 +1,13 @@
-# Machine Learning Institute - Week 6 - Fine tuning and rlhf
+# Machine Learning Institute - Week 6 - Fine-tuning and RLHF
 
 This week, we are experimenting with reinforcement learning on a large language model.
 
 Using this blog post as a starting point, we will be experimenting with:
 
 * Performing some fine tuning on a base model (to e.g. perform summarization)
-* Attempting to train a reward model on top of a base model
-* Performing RLHF using PPO and evaluating the fine tuning
+* Attempting to train a reward model on top of a base model, and analyzing its robustness
+* Performing reinforcement learning with human feedback (RLHF) using Proximal Policy Optimization (PPO) or a variant
+* Evaluating the tweaked model
 
 # Set-up
 
