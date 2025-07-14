@@ -1,0 +1,58 @@
+# Repo specific
+wandb/
+datasets/
+artifacts/
+cache/
+model/datasets/
+model/cache/
+model/wandb/
+*.pkl
+
+# Ignore Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Ignore virtual environments
+venv/
+.venv/
+.env/
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore logs
+*.log
+*.out
+*.err
+
+# Ignore dataset and ML model files
+*.h5
+*.hdf5
+*.csv
+*.tsv
+*.pkl
+*.joblib
+*.npy
+*.npz
+
+# Ignore IDE-specific files
+.vscode/
+.idea/
+
+# Ignore miscellaneous files
+.DS_Store
+Thumbs.db
+
+# Ignore Git-specific files
+*.orig
+*.rej
+*.patch
+*.diff
+
+# Ignore temporary files
+*.tmp
+*.temp
+~$*
