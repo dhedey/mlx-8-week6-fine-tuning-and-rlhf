@@ -59,7 +59,7 @@ def set_seed(seed_val=42):
 
 def main():
     output_dir = os.path.join(os.path.dirname(__file__), "snapshots", "tldr_fine_tuned")
-    train_batch_size = 16
+    train_batch_size = 8
     gradient_accumulation_steps = 1
     learning_rate = 1e-5
     eval_batch_size = 1
