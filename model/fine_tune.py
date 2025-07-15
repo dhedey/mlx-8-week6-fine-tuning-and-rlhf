@@ -29,13 +29,13 @@ from threading import Thread
 ### And in particular this code: https://github.com/KookyGhost/RLHF-Summarize-GPT2-Small/blob/master/SFT-gpt2-sum.ipynb
 
 class TLDRDataset(Dataset):
-    def __init__(self, train_path, tokenizer, split, max_token_length):
+    def __init__(self, train_path, tokenizer, split, max_token_length, size_cap = None):
         self.post_list = []
         dataset = load_dataset(train_path, split=split)
         for sample in dataset:
             self.post_list.append(sample["prompt"] + sample["label"])
-        if "valid" in split:
-            self.post_list = self.post_list[0:2000]
+        if size_cap is not None:
+            self.post_list = self.post_list[0:size_cap]
         self.tokenizer = tokenizer
         self.max_token_length = max_token_length
         self.input_ids = []
@@ -150,8 +150,8 @@ def main():
     gradient_accumulation_steps = 1
     learning_rate = 1e-5
     eval_batch_size = 1
-    eval_steps = 500
-    max_input_token_length = 1028
+    eval_steps = 1000
+    max_input_token_length = 700
     save_steps = 1000
     num_train_epochs = 1
     random.seed(42)
@@ -186,6 +186,7 @@ def main():
         data_path,
         tokenizer,
         "train",
+        size_cap=6000,
         max_token_length=max_input_token_length,
     )
     print(f"Train dataset size: {len(train_dataset)}. Expected batches: {(len(train_dataset) // train_batch_size)}")
@@ -193,6 +194,7 @@ def main():
         data_path,
         tokenizer,
         "valid",
+        size_cap=100,
         max_token_length=max_input_token_length,
     )
 
