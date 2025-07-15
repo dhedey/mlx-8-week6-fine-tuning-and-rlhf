@@ -156,6 +156,20 @@ def test_streaming_inference(model, tokenizer):
         print("\n" + "-"*50)
 
 def main():
+
+    parser = argparse.ArgumentParser(description='Train a model')
+    parser.add_argument(
+        '--resume',
+        action='store_true',
+    )
+    args = parser.parse_args()
+    if args.resume:
+        print("Resuming...")
+        resume = True
+    else:
+        print("No --resume flag was supplied, so starting from scratch...")
+        resume = False
+
     output_dir = os.path.join(os.path.dirname(__file__), "snapshots", "tldr_fine_tuned")
     trained_output_dir = os.path.join(os.path.dirname(__file__), "trained", "tldr_fine_tuned")
     train_batch_size = 4
@@ -270,7 +284,7 @@ def main():
     test_streaming_inference(model, tokenizer)
 
     trainer.train(
-        resume_from_checkpoint=True,
+        resume_from_checkpoint=resume,
     )
     
     # Test streaming inference with the trained model
