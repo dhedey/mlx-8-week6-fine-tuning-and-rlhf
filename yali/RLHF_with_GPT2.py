@@ -74,7 +74,7 @@ eval_batch_size = 1
 eval_steps = 2000
 max_input_length = 550
 save_steps = 4000
-num_train_epochs = 5
+num_train_epochs = 1
 random.seed(42)
 
 tokenizer = AutoTokenizer.from_pretrained("gpt2")
