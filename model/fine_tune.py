@@ -69,8 +69,8 @@ def main():
     num_train_epochs = 5
     random.seed(42)
 
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-1.7B-Base")
-    model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-1.7B-Base", use_cache=False)
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
+    model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B-Base", use_cache=False)
     tokenizer.pad_token = tokenizer.eos_token
     model.resize_token_embeddings(len(tokenizer))
     tokenizer.pad_token_id = tokenizer.eos_token_id
