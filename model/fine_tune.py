@@ -103,15 +103,19 @@ def stream_generate_summary(model, tokenizer, prompt, max_new_tokens=50):
         "generation_config": generation_config,
         "streamer": streamer,
     }
+
+    with torch.no_grad():
+        model.disable_gradient_checkpointing()
+
+        thread = Thread(target=model.generate, kwargs=generation_kwargs)
+        thread.start()
     
-    thread = Thread(target=model.generate, kwargs=generation_kwargs)
-    thread.start()
-    
-    try:
-        for token in streamer:
-            yield token
-    finally:
-        thread.join()
+        try:
+            for token in streamer:
+                yield token
+        finally:
+            thread.join()
+            model.enable_gradient_checkpointing()
 
 def test_streaming_inference(model, tokenizer):
     """Test the streaming capabilities of the trained model"""
