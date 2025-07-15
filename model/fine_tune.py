@@ -29,31 +29,43 @@ from threading import Thread
 ### And in particular this code: https://github.com/KookyGhost/RLHF-Summarize-GPT2-Small/blob/master/SFT-gpt2-sum.ipynb
 
 class TLDRDataset(Dataset):
-    def __init__(self, train_path, tokenizer, split, max_token_length, size_cap = None):
-        self.post_list = []
+    def __init__(self, train_path, tokenizer, split, max_token_length, size_cap=None):
+        self.prompts = []
+        self.labels = []
         dataset = load_dataset(train_path, split=split)
         for sample in dataset:
-            self.post_list.append(sample["prompt"] + sample["label"])
+            self.prompts.append(sample["prompt"])
+            self.labels.append(sample["label"])
         if size_cap is not None:
-            self.post_list = self.post_list[0:size_cap]
+            self.prompts = self.prompts[:size_cap]
+            self.labels = self.labels[:size_cap]
         self.tokenizer = tokenizer
         self.max_token_length = max_token_length
-        self.input_ids = []
-        self.attn_masks = []
 
     def __len__(self):
-        return len(self.post_list)
+        return len(self.prompts)
 
     def __getitem__(self, idx):
-        txt = self.post_list[idx]
-        encodings_dict = self.tokenizer(txt, truncation=True, max_length=self.max_token_length, padding="max_length")
-        input_ids = torch.tensor(encodings_dict["input_ids"])
-        attn_masks = torch.tensor(encodings_dict["attention_mask"])
-
+        prompt = self.prompts[idx]
+        label = self.labels[idx]
+        # Tokenize prompt and label separately
+        prompt_ids = self.tokenizer(prompt, add_special_tokens=False)["input_ids"]
+        label_ids = self.tokenizer(label, add_special_tokens=False)["input_ids"]
+        # Concatenate and truncate
+        input_ids = (prompt_ids + label_ids)[:self.max_token_length]
+        attn_mask = [1] * len(input_ids)
+        # Pad if necessary
+        pad_len = self.max_token_length - len(input_ids)
+        if pad_len > 0:
+            input_ids += [self.tokenizer.pad_token_id] * pad_len
+            attn_mask += [0] * pad_len
+        # Mask prompt tokens in labels
+        labels = input_ids.copy()
+        labels[:min(len(prompt_ids), self.max_token_length)] = [-100] * min(len(prompt_ids), self.max_token_length)
         return {
-            "input_ids": input_ids,
-            "attention_mask": attn_masks,
-            "labels": input_ids,
+            "input_ids": torch.tensor(input_ids),
+            "attention_mask": torch.tensor(attn_mask),
+            "labels": torch.tensor(labels),
         }
     
 def set_seed(seed_val=42):
