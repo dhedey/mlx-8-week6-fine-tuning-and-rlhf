@@ -172,16 +172,16 @@ def main():
 
     output_dir = os.path.join(os.path.dirname(__file__), "snapshots", "tldr_fine_tuned")
     trained_output_dir = os.path.join(os.path.dirname(__file__), "trained", "tldr_fine_tuned")
-    train_batch_size = 4
+    train_batch_size = 8
     gradient_accumulation_steps = 1
     learning_rate = 1e-5
     eval_batch_size = 1
-    eval_steps = 1000
+    eval_steps = 500
     eval_dataset_size = 400
     max_input_token_length = 700
-    save_steps = 1000
+    save_steps = 500
     num_train_epochs = 1
-    train_dataset_size = 24000
+    train_dataset_size = 16000
     random.seed(42)
 
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
