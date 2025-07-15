@@ -20,6 +20,7 @@ from transformers import (
     default_data_collator,
     TextIteratorStreamer,
     GenerationConfig,
+    TrainerCallback,
 )
 from threading import Thread
 
@@ -231,7 +232,8 @@ def main():
     )
 
     class PrintEvalCallback(TrainerCallback):
-        def on_evaluate(self, args, state, control, model=None, **kwargs):
+        def on_evaluate(self, args, state, control, metrics=None, model=None, **kwargs):
+            print("Evaluation metrics:", metrics)
             test_streaming_inference(model, tokenizer)
 
     trainer = Trainer(
@@ -245,6 +247,9 @@ def main():
         resume_from_checkpoint=True,
         callbacks=[PrintEvalCallback()],
     )
+
+    print("\n🚀 Before training starts... Let's test streaming inference...")
+    test_streaming_inference(model, tokenizer)
 
     trainer.train()
     trainer.save_model(output_dir)
