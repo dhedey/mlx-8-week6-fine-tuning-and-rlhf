@@ -198,7 +198,7 @@ def main():
         data_path,
         tokenizer,
         "train",
-        size_cap=6000,
+        size_cap=24000,
         max_token_length=max_input_token_length,
     )
     print(f"Train dataset size: {len(train_dataset)}. Expected batches: {(len(train_dataset) // train_batch_size)}")
@@ -206,7 +206,7 @@ def main():
         data_path,
         tokenizer,
         "valid",
-        size_cap=100,
+        size_cap=400,
         max_token_length=max_input_token_length,
     )
 
