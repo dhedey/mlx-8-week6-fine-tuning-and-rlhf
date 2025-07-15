@@ -232,12 +232,13 @@ def main():
     rouge = evaluate.load("rouge")
 
     def compute_metrics(eval_preds: EvalPrediction):
-        labels_to_use = []
-        preds_to_use = []
-        for label, pred in zip(eval_preds.label_ids, eval_preds.predictions):
-            if label != -100:
-                labels_to_use.append(label)
-                preds_to_use.append(pred)
+        labels_to_use = eval_preds.label_ids
+        preds_to_use = eval_preds.predictions
+
+        # Filter out the original texts
+        preds_to_use[labels_to_use == -100] = tokenizer.pad_token_id
+        # Prevent the tokenizer throwing an exception with -100...
+        labels_to_use[labels_to_use == -100] = tokenizer.pad_token_id
 
         pred_str = tokenizer.batch_decode(preds_to_use, skip_special_tokens=True)
         label_str = tokenizer.batch_decode(labels_to_use, skip_special_tokens=True)
