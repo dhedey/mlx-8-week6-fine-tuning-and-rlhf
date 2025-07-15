@@ -66,7 +66,7 @@ def main():
     eval_steps = 500
     max_input_token_length = 1028
     save_steps = 1000
-    num_train_epochs = 5
+    num_train_epochs = 1
     random.seed(42)
 
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
@@ -135,7 +135,7 @@ def main():
         per_device_train_batch_size=train_batch_size,
         per_device_eval_batch_size=eval_batch_size,
         gradient_checkpointing=True,
-        fp16=True, # Requires GPU
+        bf16=True, # Requires GPU
         # use_mps_device=False,
         adam_beta1=0.9,
         adam_beta2=0.95,
@@ -146,6 +146,7 @@ def main():
         save_steps=save_steps,
         load_best_model_at_end=True,
         logging_steps=50,
+        max_steps=100, # Comment out after testing
     )
 
     trainer = Trainer(
