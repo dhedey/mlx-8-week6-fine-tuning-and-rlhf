@@ -20,7 +20,7 @@ from transformers import (
     default_data_collator,
     TextIteratorStreamer,
     GenerationConfig,
-    TrainerCallback,
+    TrainerCallback, EvalPrediction,
 )
 from threading import Thread
 
@@ -176,10 +176,14 @@ def main():
     gradient_accumulation_steps = 1
     learning_rate = 1e-5
     eval_batch_size = 1
-    eval_steps = 1000
+    # eval_steps = 1000
+    eval_steps = 1
+    # eval_dataset_size = 400
+    eval_dataset_size = 10
     max_input_token_length = 700
     save_steps = 1000
     num_train_epochs = 1
+    train_dataset_size = 24000
     random.seed(42)
 
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
@@ -212,7 +216,7 @@ def main():
         data_path,
         tokenizer,
         "train",
-        size_cap=24000,
+        size_cap=train_dataset_size,
         max_token_length=max_input_token_length,
     )
     print(f"Train dataset size: {len(train_dataset)}. Expected batches: {(len(train_dataset) // train_batch_size)}")
@@ -220,18 +224,23 @@ def main():
         data_path,
         tokenizer,
         "valid",
-        size_cap=400,
+        size_cap=eval_dataset_size,
         max_token_length=max_input_token_length,
     )
 
     # Set up the metric
     rouge = evaluate.load("rouge")
 
-    def compute_metrics(eval_preds):
-        labels_ids = eval_preds.label_ids
-        pred_ids = eval_preds.predictions
-        pred_str = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
-        label_str = tokenizer.batch_decode(labels_ids, skip_special_tokens=True)
+    def compute_metrics(eval_preds: EvalPrediction):
+        labels_to_use = []
+        preds_to_use = []
+        for label, pred in zip(eval_preds.label_ids, eval_preds.predictions):
+            if label != -100:
+                labels_to_use.append(label)
+                preds_to_use.append(pred)
+
+        pred_str = tokenizer.batch_decode(preds_to_use, skip_special_tokens=True)
+        label_str = tokenizer.batch_decode(labels_to_use, skip_special_tokens=True)
         result = rouge.compute(predictions=pred_str, references=label_str)
         return result
 
