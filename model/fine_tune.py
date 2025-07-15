@@ -233,7 +233,7 @@ def main():
         save_steps=save_steps,
         load_best_model_at_end=True,
         logging_steps=50,
-        max_steps=100, # Comment out after testing
+        # max_steps=100, # Comment out after testing
     )
 
     class PrintEvalCallback(TrainerCallback):
