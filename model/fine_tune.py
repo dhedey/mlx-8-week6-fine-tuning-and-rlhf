@@ -141,6 +141,7 @@ def test_streaming_inference(model, tokenizer):
 
 def main():
     output_dir = os.path.join(os.path.dirname(__file__), "snapshots", "tldr_fine_tuned")
+    trained_output_dir = os.path.join(os.path.dirname(__file__), "trained", "tldr_fine_tuned")
     train_batch_size = 4
     gradient_accumulation_steps = 1
     learning_rate = 1e-5
@@ -244,19 +245,22 @@ def main():
         compute_metrics=compute_metrics,
         data_collator=default_data_collator,
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
-        resume_from_checkpoint=True,
         callbacks=[PrintEvalCallback()],
     )
 
     print("\n🚀 Before training starts... Let's test streaming inference...")
     test_streaming_inference(model, tokenizer)
 
-    trainer.train()
-    trainer.save_model(output_dir)
+    trainer.train(
+        resume_from_checkpoint=True,
+    )
     
     # Test streaming inference with the trained model
     print("\n🚀 Training completed! Testing streaming inference...")
     test_streaming_inference(model, tokenizer)
+
+    print("\nSaving model...")
+    trainer.save_model(trained_output_dir)
     
 if __name__ == "__main__":
     main()
