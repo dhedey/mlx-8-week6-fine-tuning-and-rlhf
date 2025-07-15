@@ -176,10 +176,8 @@ def main():
     gradient_accumulation_steps = 1
     learning_rate = 1e-5
     eval_batch_size = 1
-    # eval_steps = 1000
-    eval_steps = 1
-    # eval_dataset_size = 400
-    eval_dataset_size = 10
+    eval_steps = 1000
+    eval_dataset_size = 400
     max_input_token_length = 700
     save_steps = 1000
     num_train_epochs = 1
@@ -276,8 +274,8 @@ def main():
 
     class PrintEvalCallback(TrainerCallback):
         def on_evaluate(self, args, state, control, metrics=None, model=None, **kwargs):
-            print("Evaluation metrics:", metrics)
             test_streaming_inference(model, tokenizer)
+            print("\nEvaluation metrics:", metrics)
 
     trainer = Trainer(
         model=model,
