@@ -115,7 +115,6 @@ policy_model = get_peft_model(
 )
 
 print("\n Reference policy parameters:")
-reference_policy.print_trainable_parameters()
 print_detailed_parameter_counts(reference_policy, "reference_policy")
 
 print("\n Training policy parameters:")
