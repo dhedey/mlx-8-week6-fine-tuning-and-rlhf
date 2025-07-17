@@ -173,6 +173,9 @@ class PrintEvalCallback(TrainerCallback):
         test_streaming_inference(model, tokenizer)
         print("\nEvaluation metrics:", metrics)
 
+print("\n🚀 Before PPO starts... Let's test streaming inference...")
+test_streaming_inference(policy_model, tokenizer)
+
 # Set up PPOTrainer (no custom DataLoader or collate_fn needed)
 ppo_trainer = PPOTrainer(
     ppo_config,         # args
