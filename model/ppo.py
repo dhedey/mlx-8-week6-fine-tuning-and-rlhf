@@ -101,28 +101,28 @@ base_model.config.pad_token_id = base_model.config.eos_token_id
 # Load SFT Model and Tokenizer
 # Load base model with value head, then apply LoRA adapter
 
-print("Loading the base policy, and adding a value head to act as the value model")
-lora_config = LoraConfig(
-    r=32,
-    target_modules=["q_proj", "v_proj"],
-    task_type=TaskType.CAUSAL_LM,
-    lora_alpha=16,
-    lora_dropout=0.05,
+print("Loading the base policy, and adding a value head to act as the value model...")
+peft_model = PeftModel.from_pretrained(base_model, sft_path, adapter_name="sft")
+peft_model.add_adapter(
+    adapter_name="ppo",
+    peft_config=LoraConfig(
+        r=32,
+        target_modules=["q_proj", "v_proj"],
+        task_type=TaskType.CAUSAL_LM,
+        lora_alpha=16,
+        lora_dropout=0.05,
+    ),
 )
-policy_model = AutoModelForCausalLMWithValueHead.from_pretrained(
-    PeftModel.from_pretrained(base_model, sft_path).merge_and_unload(),
-    peft_config=lora_config,
-)
-policy_model = get_peft_model(policy_model, lora_config)
+peft_model = peft_model.merge_and_unload("sft")
+
+policy_model = AutoModelForCausalLMWithValueHead.from_pretrained(peft_model)
 
 print("Loading the reference policy...")
 reference_policy = PeftModel.from_pretrained(base_model, sft_path).merge_and_unload().to(DEVICE)
+print()
 
 print_detailed_parameter_counts(reference_policy, model_name="Reference Policy (should be frozen)")
-print()
-
 print_detailed_parameter_counts(policy_model, model_name="Trained Policy (should be LoRA)")
-print()
 
 # Build Reward Model
 reward_model = TextBasedRewardModel(tokenizer)
