@@ -102,7 +102,7 @@ base_model.config.pad_token_id = base_model.config.eos_token_id
 # Load base model with value head, then apply LoRA adapter
 print("Loading the base policy, and adding a value head to act as the value model")
 policy_model = AutoModelForCausalLMWithValueHead.from_pretrained(
-    PeftModel.from_pretrained(base_model, sft_path).merge_and_unload().to(DEVICE),
+    PeftModel.from_pretrained(base_model, sft_path).merge_and_unload(),
     peft_config=LoraConfig(
         r=32,
         target_modules=["q_proj", "v_proj"],
@@ -119,7 +119,6 @@ print("\n Reference policy parameters:")
 print_detailed_parameter_counts(reference_policy, "reference_policy")
 
 print("\n Training policy parameters:")
-policy_model.print_trainable_parameters()
 print_detailed_parameter_counts(reference_policy, "policy")
 
 print()
