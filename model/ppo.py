@@ -100,9 +100,12 @@ base_model.config.pad_token_id = base_model.config.eos_token_id
 
 # Load SFT Model and Tokenizer
 # Load base model with value head, then apply LoRA adapter
+merged_model = PeftModel.from_pretrained(base_model, sft_path).merge_and_unload()
+print(merged_model.peft_config)
+
 print("Loading the base policy, and adding a value head to act as the value model")
 policy_model = AutoModelForCausalLMWithValueHead.from_pretrained(
-    PeftModel.from_pretrained(base_model, sft_path).merge_and_unload(),
+    merged_model,
     peft_config=LoraConfig(
         r=32,
         target_modules=["q_proj", "v_proj"],
@@ -124,7 +127,7 @@ print_detailed_parameter_counts(reference_policy, "policy")
 print()
 
 # Build Reward Model
-reward_model = TextBasedRewardModel(policy_model.base_model).to(DEVICE)
+reward_model = TextBasedRewardModel(tokenizer)
 reward_model.eval()
 
 data_path = "CarperAI/openai_summarize_tldr"
