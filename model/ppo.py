@@ -26,7 +26,7 @@ from transformers import (
 )
 from threading import Thread
 from peft import PeftModel
-from trl import PPOTrainer, PPOConfig, AutoModelForCausalLMWithValueHead
+from trl import PPOTrainer, PPOConfig, AutoModelForCausalLMWithValueHead, PreTrainedModelWrapper
 
 ### NOTE:
 ### This comes in large part from this blog post: https://medium.com/@Uvwxyz/rlhf-on-a-budget-gpt-2-for-summarization-39f9d016202b
@@ -101,17 +101,16 @@ base_model.config.pad_token_id = base_model.config.eos_token_id
 # Load SFT Model and Tokenizer
 # Load base model with value head, then apply LoRA adapter
 print("Loading the base policy, and adding a value head to act as the value model")
-base_policy = AutoModelForCausalLMWithValueHead(PeftModel.from_pretrained(base_model, sft_path).merge_and_unload()).to(DEVICE)
-policy_model = get_peft_model(
-    base_policy,
-    LoraConfig(
+policy_model = AutoModelForCausalLMWithValueHead.from_pretrained(
+    PeftModel.from_pretrained(base_model, sft_path).merge_and_unload().to(DEVICE),
+    peft_config=LoraConfig(
         r=32,
         target_modules=["q_proj", "v_proj"],
         task_type=TaskType.CAUSAL_LM,
         lora_alpha=16,
         lora_dropout=0.05,
-    ),
-)
+    )
+).to(DEVICE)
 
 print("Loading the reference policy...")
 reference_policy = PeftModel.from_pretrained(base_model, sft_path).merge_and_unload().to(DEVICE)
