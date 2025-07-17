@@ -27,7 +27,7 @@ from transformers import (
 )
 from threading import Thread
 from peft import PeftModel
-from trl import PPOTrainer, PPOConfig, PreTrainedModelWrapper
+from trl import PPOTrainer, PPOConfig, AutoModelForCausalLMWithValueHead
 
 ### NOTE:
 ### This comes in large part from this blog post: https://medium.com/@Uvwxyz/rlhf-on-a-budget-gpt-2-for-summarization-39f9d016202b
@@ -113,7 +113,7 @@ def main():
             lora_dropout=0.05,
         ),
     )
-    policy_model = AutoModelForSequenceClassification(peft_model, num_labels=1)
+    policy_model = AutoModelForCausalLMWithValueHead(peft_model)
 
     print("Loading the reference policy...")
     # We load it fresh as Peft destroys the base model above
