@@ -36,35 +36,6 @@ from .model_common import TLDRDataset, set_seed, stream_generate_summary, test_s
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-parser = argparse.ArgumentParser(description='Train a model')
-parser.add_argument(
-    '--resume',
-    action='store_true',
-)
-args = parser.parse_args()
-if args.resume:
-    print("Resuming...")
-    resume = True
-else:
-    print("No --resume flag was supplied, so starting from scratch...")
-    resume = False
-
-# Config
-sft_path = os.path.join(os.path.dirname(__file__), "trained/tldr_fine_tuned")
-output_dir = os.path.join(os.path.dirname(__file__), "snapshots", "colour_ppo")
-trained_output_dir = os.path.join(os.path.dirname(__file__), "trained", "colour_ppo")
-train_batch_size = 8
-gradient_accumulation_steps = 1
-learning_rate = 1e-5
-eval_batch_size = 1
-eval_steps = 500
-eval_dataset_size = 400
-max_input_token_length = 700
-save_steps = 500
-num_train_epochs = 1
-train_dataset_size = 16000
-random.seed(42)
-
 # Reward Model
 class TextBasedRewardModel(nn.Module):
     def __init__(self, tokenizer):
@@ -72,7 +43,7 @@ class TextBasedRewardModel(nn.Module):
         self.tokenizer = tokenizer
 
     def forward(self, input_ids, attention_mask=None):
-        texts = tokenizer.batch_decode(input_ids, skip_special_tokens=True)
+        texts = self.tokenizer.batch_decode(input_ids, skip_special_tokens=True)
         final_rewards = []
         target_words = {"red", "green", "yellow", "blue", "orange", "purple", "violet", "mauve", "color", "colorful",
                         "color", "light", "rainbow", "cyan", "magenta"}
@@ -87,113 +58,141 @@ class TextBasedRewardModel(nn.Module):
 
         return final_rewards
 
+def load_sft_model_and_tokenizer():
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
+    base_model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B-Base", use_cache=False)
+    tokenizer.pad_token = tokenizer.eos_token
+    base_model.resize_token_embeddings(len(tokenizer))
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+    base_model.config.end_token_id = tokenizer.eos_token_id
+    base_model.config.pad_token_id = base_model.config.eos_token_id
+    model = PeftModel.from_pretrained(base_model, sft_path, adapter_name="sft").merge_and_unload().to(DEVICE)
+    return model, tokenizer
+
 ## See https://whimsical.com/week-6-ppo-16R4j1A2455itf65D4HWkH for details
+def main():
+    parser = argparse.ArgumentParser(description='Train a model')
+    parser.add_argument(
+        '--resume',
+        action='store_true',
+    )
+    args = parser.parse_args()
+    if args.resume:
+        print("Resuming...")
+        resume = True
+    else:
+        print("No --resume flag was supplied, so starting from scratch...")
+        resume = False
 
-print("Loading Qwen Base Model...")
-tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
-base_model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B-Base", use_cache=False)
-tokenizer.pad_token = tokenizer.eos_token
-base_model.resize_token_embeddings(len(tokenizer))
-tokenizer.pad_token_id = tokenizer.eos_token_id
-base_model.config.end_token_id = tokenizer.eos_token_id
-base_model.config.pad_token_id = base_model.config.eos_token_id
+    # Config
+    sft_path = os.path.join(os.path.dirname(__file__), "trained/tldr_fine_tuned")
+    output_dir = os.path.join(os.path.dirname(__file__), "snapshots", "colour_ppo")
+    trained_output_dir = os.path.join(os.path.dirname(__file__), "trained", "colour_ppo")
+    train_batch_size = 8
+    gradient_accumulation_steps = 1
+    learning_rate = 1e-5
+    eval_batch_size = 1
+    eval_steps = 500
+    eval_dataset_size = 400
+    max_input_token_length = 700
+    save_steps = 500
+    num_train_epochs = 1
+    train_dataset_size = 16000
+    random.seed(42)
 
-# Load SFT Model and Tokenizer
-# Load base model with value head, then apply LoRA adapter
+    print("Loading the policy / value model...")
+    model, tokenizer = load_sft_model_and_tokenizer()
+    policy_model = AutoModelForCausalLMWithValueHead.from_pretrained(
+        model,
+        peft_config=LoraConfig(
+            r=32,
+            target_modules=["q_proj", "v_proj"],
+            task_type=TaskType.CAUSAL_LM,
+            lora_alpha=16,
+            lora_dropout=0.05,
+        ),
+    )
 
-print("Loading the base policy, and adding a value head to act as the value model...")
-peft_model = PeftModel.from_pretrained(base_model, sft_path, adapter_name="sft")
-peft_model.add_adapter(
-    adapter_name="ppo",
-    peft_config=LoraConfig(
-        r=32,
-        target_modules=["q_proj", "v_proj"],
-        task_type=TaskType.CAUSAL_LM,
-        lora_alpha=16,
-        lora_dropout=0.05,
-    ),
-)
-peft_model = peft_model.merge_and_unload("sft")
+    print("Loading the reference policy...")
+    # We load it fresh as Peft destroys the base model above
+    reference_policy, _ = load_sft_model_and_tokenizer()
+    print()
 
-policy_model = AutoModelForCausalLMWithValueHead.from_pretrained(peft_model)
+    print_detailed_parameter_counts(reference_policy, model_name="Reference Policy (should be frozen)")
+    print_detailed_parameter_counts(policy_model, model_name="Trained Policy (should be LoRA)")
 
-print("Loading the reference policy...")
-reference_policy = PeftModel.from_pretrained(base_model, sft_path).merge_and_unload().to(DEVICE)
-print()
+    # Build Reward Model
+    reward_model = TextBasedRewardModel(tokenizer)
+    reward_model.eval()
 
-print_detailed_parameter_counts(reference_policy, model_name="Reference Policy (should be frozen)")
-print_detailed_parameter_counts(policy_model, model_name="Trained Policy (should be LoRA)")
+    data_path = "CarperAI/openai_summarize_tldr"
+    train_dataset = TLDRDataset(
+        data_path,
+        tokenizer,
+        "train",
+        size_cap=train_dataset_size,
+        max_token_length=max_input_token_length,
+    )
+    print(f"Train dataset size: {len(train_dataset)}. Expected batches: {(len(train_dataset) // train_batch_size)}")
+    eval_dataset = TLDRDataset(
+        data_path,
+        tokenizer,
+        "valid",
+        size_cap=eval_dataset_size,
+        max_token_length=max_input_token_length,
+    )
+    print(f"Eval dataset size: {len(eval_dataset)}. Expected batches: {(len(eval_dataset) // eval_batch_size)}")
 
-# Build Reward Model
-reward_model = TextBasedRewardModel(tokenizer)
-reward_model.eval()
+    # Set up the metric
+    rouge = evaluate.load("rouge")
 
-data_path = "CarperAI/openai_summarize_tldr"
-train_dataset = TLDRDataset(
-    data_path,
-    tokenizer,
-    "train",
-    size_cap=train_dataset_size,
-    max_token_length=max_input_token_length,
-)
-print(f"Train dataset size: {len(train_dataset)}. Expected batches: {(len(train_dataset) // train_batch_size)}")
-eval_dataset = TLDRDataset(
-    data_path,
-    tokenizer,
-    "valid",
-    size_cap=eval_dataset_size,
-    max_token_length=max_input_token_length,
-)
-print(f"Eval dataset size: {len(eval_dataset)}. Expected batches: {(len(eval_dataset) // eval_batch_size)}")
+    ppo_config = PPOConfig(
+        output_dir=output_dir,
+        eval_strategy="steps",
+        eval_accumulation_steps=1,
+        learning_rate=learning_rate,
+        batch_size=train_batch_size,
+        mini_batch_size=1,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        adam_beta1=0.9,
+        adam_beta2=0.95,
+        bf16=True,
+        num_train_epochs=num_train_epochs,
+        warmup_steps=100,
+        eval_steps=eval_steps,
+        save_steps=save_steps,
+        load_best_model_at_end=True,
+        logging_steps=50,
+    )
 
-# Set up the metric
-rouge = evaluate.load("rouge")
+    class PrintEvalCallback(TrainerCallback):
+        def on_evaluate(self, args, state, control, metrics=None, model=None, **kwargs):
+            test_streaming_inference(model, tokenizer)
+            print("\nEvaluation metrics:", metrics)
 
-ppo_config = PPOConfig(
-    output_dir=output_dir,
-    eval_strategy="steps",
-    eval_accumulation_steps=1,
-    learning_rate=learning_rate,
-    batch_size=train_batch_size,
-    mini_batch_size=1,
-    gradient_accumulation_steps=gradient_accumulation_steps,
-    adam_beta1=0.9,
-    adam_beta2=0.95,
-    bf16=True,
-    num_train_epochs=num_train_epochs,
-    warmup_steps=100,
-    eval_steps=eval_steps,
-    save_steps=save_steps,
-    load_best_model_at_end=True,
-    logging_steps=50,
-)
+    print("\n🚀 Before PPO starts... Let's test streaming inference...")
+    test_streaming_inference(policy_model, tokenizer)
 
-class PrintEvalCallback(TrainerCallback):
-    def on_evaluate(self, args, state, control, metrics=None, model=None, **kwargs):
-        test_streaming_inference(model, tokenizer)
-        print("\nEvaluation metrics:", metrics)
+    # Set up PPOTrainer (no custom DataLoader or collate_fn needed)
+    ppo_trainer = PPOTrainer(
+        ppo_config,         # args
+        tokenizer,          # processing_class
+        model=policy_model,              # policy model (policy, with value head and LoRA)
+        ref_model=reference_policy,      # reference model
+        reward_model=reward_model,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        value_model=policy_model,        # value_model (with value head)
+        callbacks=[PrintEvalCallback()],
+    )
 
-print("\n🚀 Before PPO starts... Let's test streaming inference...")
-test_streaming_inference(policy_model, tokenizer)
+    # Run PPO training
+    ppo_trainer.train(
+        resume_from_checkpoint=resume,
+    )
 
-# Set up PPOTrainer (no custom DataLoader or collate_fn needed)
-ppo_trainer = PPOTrainer(
-    ppo_config,         # args
-    tokenizer,          # processing_class
-    model=policy_model,              # policy model (policy, with value head and LoRA)
-    ref_model=reference_policy,      # reference model
-    reward_model=reward_model,
-    train_dataset=train_dataset,
-    eval_dataset=eval_dataset,
-    value_model=policy_model,        # value_model (with value head)
-    callbacks=[PrintEvalCallback()],
-)
+    # Save the PPO-updated model
+    policy_model.save_pretrained(trained_output_dir)
 
-# Run PPO training
-ppo_trainer.train(
-    resume_from_checkpoint=resume,
-)
-
-# Save the PPO-updated model
-policy_model.save_pretrained(trained_output_dir)
-
+if __name__ == "__main__":
+    main()
