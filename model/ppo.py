@@ -88,6 +88,8 @@ class TextBasedRewardModel(nn.Module):
         return final_rewards
 
 ## See https://whimsical.com/week-6-ppo-16R4j1A2455itf65D4HWkH for details
+
+print("Loading Qwen Base Model...")
 tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
 base_model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B-Base", use_cache=False)
 tokenizer.pad_token = tokenizer.eos_token
@@ -96,13 +98,10 @@ tokenizer.pad_token_id = tokenizer.eos_token_id
 base_model.config.end_token_id = tokenizer.eos_token_id
 base_model.config.pad_token_id = base_model.config.eos_token_id
 
-
 # Load SFT Model and Tokenizer
-sft_model = PeftModel.from_pretrained(base_model, sft_path).merge_and_unload().to(DEVICE)
-
 # Load base model with value head, then apply LoRA adapter
-base_policy = AutoModelForCausalLMWithValueHead(sft_model).to(DEVICE)
-reference_policy = AutoModelForCausalLMWithValueHead(sft_model).to(DEVICE) # Shouldn't copy the weights (hopefully)
+print("Loading the base policy, and adding a value head to act as the value model")
+base_policy = AutoModelForCausalLMWithValueHead(PeftModel.from_pretrained(base_model, sft_path).merge_and_unload()).to(DEVICE)
 policy_model = get_peft_model(
     base_policy,
     LoraConfig(
@@ -113,6 +112,9 @@ policy_model = get_peft_model(
         lora_dropout=0.05,
     ),
 )
+
+print("Loading the reference policy...")
+reference_policy = PeftModel.from_pretrained(base_model, sft_path).merge_and_unload().to(DEVICE)
 
 print("\n Reference policy parameters:")
 print_detailed_parameter_counts(reference_policy, "reference_policy")
