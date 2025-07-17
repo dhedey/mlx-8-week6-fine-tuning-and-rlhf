@@ -103,7 +103,7 @@ def main():
 
     print("Loading the policy / value model...")
     model, tokenizer = load_sft_model_and_tokenizer(sft_path)
-    peft_model = get_peft_model(
+    policy_model = get_peft_model(
         model,
         peft_config=LoraConfig(
             r=32,
@@ -113,7 +113,7 @@ def main():
             lora_dropout=0.05,
         ),
     )
-    policy_model = AutoModelForCausalLMWithValueHead(peft_model)
+    value_model = AutoModelForCausalLMWithValueHead(policy_model)
 
     print("Loading the reference policy...")
     # We load it fresh as Peft destroys the base model above
@@ -121,7 +121,8 @@ def main():
     print()
 
     print_detailed_parameter_counts(reference_policy, model_name="Reference Policy (should be frozen)")
-    print_detailed_parameter_counts(policy_model, model_name="Trained Policy (should be LoRA)")
+    print_detailed_parameter_counts(value_model, model_name="Value Model (should be LoRA + Value Head)")
+    print_detailed_parameter_counts(policy_model, model_name="Policy Model (should be LoRA)")
 
     # Build Reward Model
     reward_model = TextBasedRewardModel(tokenizer)
@@ -173,18 +174,18 @@ def main():
             print("\nEvaluation metrics:", metrics)
 
     print("\n🚀 Before PPO starts... Let's test streaming inference...")
-    test_streaming_inference(policy_model, tokenizer)
+    test_streaming_inference(value_model, tokenizer)
 
     # Set up PPOTrainer (no custom DataLoader or collate_fn needed)
     ppo_trainer = PPOTrainer(
         ppo_config,         # args
         tokenizer,          # processing_class
-        model=policy_model,              # policy model (policy, with value head and LoRA)
-        ref_model=reference_policy,      # reference model
+        model=policy_model,
+        ref_model=reference_policy,
         reward_model=reward_model,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
-        value_model=policy_model,        # value_model (with value head)
+        value_model=value_model,
         callbacks=[PrintEvalCallback()],
     )
 
@@ -194,7 +195,7 @@ def main():
     )
 
     # Save the PPO-updated model
-    policy_model.save_pretrained(trained_output_dir)
+    value_model.save_pretrained(trained_output_dir)
 
 if __name__ == "__main__":
     main()
