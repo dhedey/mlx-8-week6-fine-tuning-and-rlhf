@@ -102,7 +102,7 @@ sft_model = PeftModel.from_pretrained(base_model, sft_path).merge_and_unload().t
 
 # Load base model with value head, then apply LoRA adapter
 base_policy = AutoModelForCausalLMWithValueHead(sft_model).to(DEVICE)
-reference_policy = base_policy.clone().to(DEVICE)
+reference_policy = AutoModelForCausalLMWithValueHead(sft_model).to(DEVICE) # Shouldn't copy the weights (hopefully)
 policy_model = get_peft_model(
     base_policy,
     LoraConfig(
