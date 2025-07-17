@@ -185,7 +185,7 @@ class ModelBase(nn.Module):
     def print_detailed_parameter_counts(self) -> None:
         print_detailed_parameter_counts(self, f"model ({self.model_name})")
 
-def print_detailed_parameter_counts(nn_module, module_name, only_learnable: bool =True) -> None:
+def print_detailed_parameter_counts(nn_module, module_name: Optional[str] = None, model_name: Optional[str] = None, only_learnable: bool =True) -> None:
     @dataclasses.dataclass
     class NodeContent:
         # The number of distinct named parameters which have hit this path
@@ -310,7 +310,9 @@ def print_detailed_parameter_counts(nn_module, module_name, only_learnable: bool
     for name, parameter in nn_module.named_parameters():
         root_node.add(name.split("."), parameter.requires_grad, parameter.numel())
 
-    print(f"This {nn_module.__class__.__name__} has the following learnable weights:")
-    root_node.print(root_name=module_name, only_learnable=only_learnable)
+    model_name = model_name if model_name is not None else nn_module.__class__.__name__
+    print(f"This {model_name} has the following learnable weights:")
+    root_name = module_name if module_name is not None else "root"
+    root_node.print(root_name=root_name, only_learnable=only_learnable)
     print()
 
