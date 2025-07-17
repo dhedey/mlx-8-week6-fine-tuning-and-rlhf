@@ -113,7 +113,7 @@ def main():
             lora_dropout=0.05,
         ),
     )
-    policy_model = AutoModelForSequenceClassification.from_pretrained(peft_model, num_labels=1)
+    policy_model = AutoModelForSequenceClassification(peft_model, num_labels=1)
 
     print("Loading the reference policy...")
     # We load it fresh as Peft destroys the base model above
