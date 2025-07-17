@@ -185,7 +185,7 @@ class ModelBase(nn.Module):
     def print_detailed_parameter_counts(self) -> None:
         print_detailed_parameter_counts(self, f"model ({self.model_name})")
 
-def print_detailed_parameter_counts(nn_module, module_name) -> None:
+def print_detailed_parameter_counts(nn_module, module_name, only_learnable: bool =True) -> None:
     @dataclasses.dataclass
     class NodeContent:
         # The number of distinct named parameters which have hit this path
@@ -220,26 +220,38 @@ def print_detailed_parameter_counts(nn_module, module_name) -> None:
                 child_node.add(path, requires_grad, param_count)
 
         def print(
-                self,
-                prefix: str = "",
-                depth: int = 0,
-                total_learnable: Optional[int] = None,
-                total_any: Optional[int] = None,
+            self,
+            only_learnable: bool,
+            prefix: str = "",
+            depth: int = 0,
+            total_learnable: Optional[int] = None,
+            total_any: Optional[int] = None,
         ) -> None:
-            indent = "  " * depth
+            if depth > 0 and only_learnable and self.learnable_param_count == 0:
+                # If this node has no learnable parameters under it, we skip it
+                return
+            
             if total_learnable is None:
                 total_learnable = self.learnable_param_count
-            learnable_just_len = max(len("Learnable Weights"), len(f"{total_learnable:,}"))
             if total_any is None:
                 total_any = self.total_param_count
-                print(f" Leaf | {"Learnable Weights".rjust(learnable_just_len)} | %Learn |   %All | Module")
+
+            learnable_just_len = max(len("# Learn Weights"), len(f"{total_learnable:,}"))
+            total_just_len = max(len("# Any Weights"), len(f"{total_any:,}"))
+
+            if depth == 0:
+                print(f" Leaf | {"# Learn Weights".rjust(learnable_just_len)} | %AllLearn | %AllAny | {"# Any Weights".rjust(total_just_len)} | %AllAny | Module")
+
+            indent = "  " * depth
 
             leaf_part = ("**" if len(self.children) == 0 else " ").center(6)
             learnable_part = f"{self.learnable_param_count:,}".rjust(learnable_just_len)
-            perc_learnable_part = f"{self.learnable_param_count / total_learnable:.1%}".rjust(6)
-            perc_all_part = f"{self.learnable_param_count / total_any:.1%}".rjust(6)
+            perc_learnable_part = f"{self.learnable_param_count / total_learnable:.2%}".rjust(9) if total_learnable > 0 else "---.--%".rjust(9)
+            perc_learnable_all_part = f"{self.learnable_param_count / total_any:.2%}".rjust(7) if total_any > 0 else "---.--%".rjust(7)
+            any_weights = f"{self.total_param_count:,}".rjust(learnable_just_len)
+            perc_any_all_weights = f"{self.total_param_count / total_any:.2%}".rjust(7) if total_any > 0 else "---.--%".rjust(7)
 
-            print_prefix = f"{leaf_part}| {learnable_part} | {perc_learnable_part} | {perc_all_part} | {indent}"
+            print_prefix = f"{leaf_part}| {learnable_part} | {perc_learnable_part} | {perc_learnable_all_part} | {any_weights} | {perc_any_all_weights} | {indent}"
 
             match len(self.children):
                 case 0:
@@ -257,6 +269,7 @@ def print_detailed_parameter_counts(nn_module, module_name) -> None:
                         child_key = f"{child_key}[count={len(child_keys)}]"
                     child_node.print(
                         prefix=f"{prefix}.{child_key}",
+                        only_learnable=only_learnable,
                         depth=depth,
                         total_learnable=total_learnable,
                         total_any=total_any,
@@ -277,6 +290,7 @@ def print_detailed_parameter_counts(nn_module, module_name) -> None:
                             child_key = f"{child_key}[{len(child_keys)}]"
                         child_node.print(
                             prefix=f".{child_key}",
+                            only_learnable=only_learnable,
                             depth=depth + 1,
                             total_learnable=total_learnable,
                             total_any=total_any,
@@ -288,6 +302,6 @@ def print_detailed_parameter_counts(nn_module, module_name) -> None:
         root_node.add(name.split("."), parameter.requires_grad, parameter.numel())
 
     print(f"This {nn_module.__class__.__name__} has the following learnable weights:")
-    root_node.print(prefix=module_name)
+    root_node.print(prefix=module_name, only_learnable=only_learnable)
     print()
 
