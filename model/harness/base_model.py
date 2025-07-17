@@ -185,7 +185,7 @@ class ModelBase(nn.Module):
     def print_detailed_parameter_counts(self) -> None:
         print_detailed_parameter_counts(self, f"model ({self.model_name})")
 
-def print_detailed_parameter_counts(nn_module, module_name: Optional[str] = None, model_name: Optional[str] = None, only_learnable: bool =True) -> None:
+def print_detailed_parameter_counts(nn_module, model_name: Optional[str] = None, module_name: Optional[str] = None, only_learnable: bool = True) -> None:
     @dataclasses.dataclass
     class NodeContent:
         # The number of distinct named parameters which have hit this path
@@ -223,10 +223,10 @@ def print_detailed_parameter_counts(nn_module, module_name: Optional[str] = None
             total_learnable = self.learnable_param_count
             total_any = self.total_param_count
 
-            learnable_just_len = max(len("# Learn Weights"), len(f"{total_learnable:,}"))
-            any_just_len = max(len("# Any Weights"), len(f"{total_any:,}"))
+            learnable_just_len = max(len("# Learnable"), len(f"{total_learnable:,}"))
+            any_just_len = max(len("# Any"), len(f"{total_any:,}"))
 
-            print(f" Leaf | {"# Learn Weights".rjust(learnable_just_len)} | %AllLearn | %AllAny | {"# Any Weights".rjust(any_just_len)} | %AllAny | Module")
+            print(f" Leaf | {"# Learnable".rjust(learnable_just_len)} | %AllLearn | %AllAny | {"# Any".rjust(any_just_len)} | %AllAny | Module")
 
             self._print_subtree(
                 only_learnable=only_learnable,
@@ -311,7 +311,8 @@ def print_detailed_parameter_counts(nn_module, module_name: Optional[str] = None
         root_node.add(name.split("."), parameter.requires_grad, parameter.numel())
 
     model_name = model_name if model_name is not None else nn_module.__class__.__name__
-    print(f"This {model_name} has the following learnable weights:")
+    weights_name = "learnable weights" if only_learnable else "weights"
+    print(f"This {model_name} has the following {weights_name}:")
     root_name = module_name if module_name is not None else "root"
     root_node.print(root_name=root_name, only_learnable=only_learnable)
     print()

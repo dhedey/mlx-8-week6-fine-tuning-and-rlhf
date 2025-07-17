@@ -100,28 +100,26 @@ base_model.config.pad_token_id = base_model.config.eos_token_id
 
 # Load SFT Model and Tokenizer
 # Load base model with value head, then apply LoRA adapter
-merged_model = PeftModel.from_pretrained(base_model, sft_path).merge_and_unload()
-merged_model.peft_config = None # Fix a bug where the peft config is not deleted
 
 print("Loading the base policy, and adding a value head to act as the value model")
 policy_model = AutoModelForCausalLMWithValueHead.from_pretrained(
-    merged_model,
+    PeftModel.from_pretrained(base_model, sft_path).merge_and_unload(),
     peft_config=LoraConfig(
         r=32,
         target_modules=["q_proj", "v_proj"],
         task_type=TaskType.CAUSAL_LM,
         lora_alpha=16,
         lora_dropout=0.05,
-    )
-).to(DEVICE)
+    ),
+)
 
 print("Loading the reference policy...")
 reference_policy = PeftModel.from_pretrained(base_model, sft_path).merge_and_unload().to(DEVICE)
 
-print_detailed_parameter_counts(reference_policy, "Reference Policy (should be frozen)")
+print_detailed_parameter_counts(reference_policy, model_name="Reference Policy (should be frozen)")
 print()
 
-print_detailed_parameter_counts(reference_policy, "Trained Policy (should be LoRA)")
+print_detailed_parameter_counts(policy_model, model_name="Trained Policy (should be LoRA)")
 print()
 
 # Build Reward Model
