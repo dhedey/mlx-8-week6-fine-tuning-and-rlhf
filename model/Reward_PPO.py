@@ -6,6 +6,7 @@ from peft import PeftModel
 from trl import PPOTrainer, PPOConfig, AutoModelForCausalLMWithValueHead
 from datasets import load_dataset
 import copy
+import os
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -35,7 +36,7 @@ class RewardModel(nn.Module):
         return final_rewards
 
 # Load SFT Model and Tokenizer
-sft_path = "trained/tldr_fine_tuned"
+sft_path = os.path.join(os.path.dirname(__file__), "trained/tldr_fine_tuned")
 tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
 
 # Load base model with value head, then apply LoRA adapter
