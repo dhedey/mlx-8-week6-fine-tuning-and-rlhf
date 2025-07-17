@@ -58,7 +58,7 @@ class TextBasedRewardModel(nn.Module):
 
         return final_rewards
 
-def load_sft_model_and_tokenizer():
+def load_sft_model_and_tokenizer(sft_path):
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
     base_model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B-Base", use_cache=False)
     tokenizer.pad_token = tokenizer.eos_token
@@ -101,7 +101,7 @@ def main():
     random.seed(42)
 
     print("Loading the policy / value model...")
-    model, tokenizer = load_sft_model_and_tokenizer()
+    model, tokenizer = load_sft_model_and_tokenizer(sft_path)
     policy_model = AutoModelForCausalLMWithValueHead.from_pretrained(
         model,
         peft_config=LoraConfig(
@@ -115,7 +115,7 @@ def main():
 
     print("Loading the reference policy...")
     # We load it fresh as Peft destroys the base model above
-    reference_policy, _ = load_sft_model_and_tokenizer()
+    reference_policy, _ = load_sft_model_and_tokenizer(sft_path)
     print()
 
     print_detailed_parameter_counts(reference_policy, model_name="Reference Policy (should be frozen)")
