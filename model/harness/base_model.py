@@ -233,7 +233,9 @@ def print_detailed_parameter_counts(nn_module, model_name: Optional[str] = None,
                 prefix=root_name,
                 depth=0,
                 total_learnable=total_learnable,
+                learnable_just_len=learnable_just_len,
                 total_any=total_any,
+                any_just_len=any_just_len,
             )
 
         def _print_subtree(
@@ -242,14 +244,13 @@ def print_detailed_parameter_counts(nn_module, model_name: Optional[str] = None,
             prefix: str,
             depth: int,
             total_learnable: int,
+            learnable_just_len: int,
             total_any: int,
+            any_just_len: int,
         ) -> None:
             if depth > 0 and only_learnable and self.learnable_param_count == 0:
                 # If this node has no learnable parameters under it, we skip it
                 return
-
-            learnable_just_len = max(len("# Learn Weights"), len(f"{total_learnable:,}"))
-            any_just_len = max(len("# Any Weights"), len(f"{total_any:,}"))
 
             indent = "  " * depth
 
@@ -281,7 +282,9 @@ def print_detailed_parameter_counts(nn_module, model_name: Optional[str] = None,
                         only_learnable=only_learnable,
                         depth=depth,
                         total_learnable=total_learnable,
+                        learnable_just_len=learnable_just_len,
                         total_any=total_any,
+                        any_just_len=any_just_len,
                     )
                 case _:
                     print(f"{print_prefix}{prefix}")
@@ -302,7 +305,9 @@ def print_detailed_parameter_counts(nn_module, model_name: Optional[str] = None,
                             only_learnable=only_learnable,
                             depth=depth + 1,
                             total_learnable=total_learnable,
+                            learnable_just_len=learnable_just_len,
                             total_any=total_any,
+                            any_just_len=any_just_len,
                         )
 
     root_node = NodeContent.default()
